@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import BtnCamera from "./components/BtnCamera";
+import TextStyles from "./components/TextStyles";
+import Header from "./components/Header";
+import Step from "./components/Step";
 
 function App() {
 	const [image, setImage] = useState(null);
@@ -94,57 +98,31 @@ function App() {
 	};
 
 	return (
-		<div style={{ padding: 16 }}>
-			<h2>Good Morning</h2>
-
-			<input type="file" accept="image/*" onChange={handleImagePick} />
-
-			<div style={{ marginTop: 12 }}>
-				{presets.map((p) => (
-					<button
-						key={p}
-						onClick={() => setText(p)}
-						style={{ marginRight: 8 }}
-					>
-						{p}
-					</button>
-				))}
-			</div>
-			<button onClick={downloadImage}>Download</button>
-			<button onClick={shareImage}>Share</button>
-
-			<canvas
-				ref={canvasRef}
-				style={{ maxWidth: "100%", borderRadius: 8 }}
-			/>
-
-			{/* {image && (
-				<div style={{ marginTop: 16, position: "relative" }}>
-					<img
-						src={image}
-						alt="Selected"
-						style={{ width: "100%", borderRadius: 8 }}
-					/>
-
-					{text && (
-						<div
-							style={{
-								position: "absolute",
-								bottom: 12,
-								left: 0,
-								right: 0,
-								textAlign: "center",
-								color: "white",
-								fontSize: 24,
-								fontWeight: "bold",
-								textShadow: "0 2px 6px rgba(0,0,0,0.6)",
-							}}
-						>
-							{text}
-						</div>
-					)}
+		<div className="main">
+			<Header />
+			<h1 style={{ textIndent: -9999999999, position: "absolute" }}>
+				Good Morning App
+			</h1>
+			<div className="ui-wrap">
+				<div className="ui-wrap-inner">
+					<div className="steps">
+						<Step text1={"Tap The "} text2={"Button"} />
+						<Step text1={"Take a "} text2={"Photo"} />
+						<Step text1={"share on "} text2={"Whatsapp"} />
+					</div>
+					<label htmlFor="input-file">
+						<BtnCamera />
+					</label>
 				</div>
-			)} */}
+				{/* <TextStyles /> */}
+				<input
+					id="input-file"
+					className="input-file"
+					type="file"
+					accept="image/*"
+					onChange={handleImagePick}
+				/>
+			</div>
 		</div>
 	);
 }
