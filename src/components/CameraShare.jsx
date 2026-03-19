@@ -1,6 +1,6 @@
 import colors from "../theme/colors";
 
-const CameraShare = ({ onCameraPress }) => {
+const CameraShare = ({ onCameraPress, onSharePress }) => {
 	return (
 		<div className="camera-wrap camera-wrap-with-share">
 			<label htmlFor="input-file">
@@ -20,7 +20,7 @@ const CameraShare = ({ onCameraPress }) => {
 					</svg>
 				</div>
 			</label>
-			<button className="btn-share">Share</button>
+			<button className="btn-share" onClick={onSharePress}>Share</button>
 		</div>
 	);
 };

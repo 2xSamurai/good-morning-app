@@ -6,109 +6,20 @@ import Step from "./components/Step";
 import CameraShare from "./components/CameraShare";
 
 function App() {
-	const [image, setImage] = useState(null);
+	const [imageFile, setImageFile] = useState(null);
 	const [activeStyle, setActiveStyle] = useState(0);
-	const [text, setText] = useState("");
-	const [textY, setTextY] = useState(null);
+	const [sliderValue, setSliderValue] = useState(85); // 0–100, maps to % of image height
 	const canvasRef = useRef(null);
-	const boxRef = useRef(null);
-	const isDragging = useRef(false);
-	const dragOffset = useRef(0);
-	const imageSizeRef = useRef({ width: 0, height: 0 });
 
 	useEffect(() => {
-		if (image || text) {
-			console.log("image", image);
-			drawCanvas(image, text);
+		if (imageFile) {
+			drawCanvas(imageFile);
 		}
-	}, [image, text, textY]);
-
-	useEffect(() => {
-		const canvas = canvasRef.current;
-
-		const handleTouchStart = (e) => {
-			if (!boxRef.current) return;
-			const touchY = getCanvasY(e.touches[0].clientY);
-			const box = boxRef.current;
-
-			if (touchY >= box.y && touchY <= box.y + box.height) {
-				isDragging.current = true;
-				dragOffset.current = touchY - textY;
-			}
-		};
-
-		const handleTouchMove = (e) => {
-			if (!isDragging.current) return;
-
-			const touchY = getCanvasY(e.touches[0].clientY);
-			// setTextY(touchY - dragOffset.current);
-			setTextY((prev) => {
-				const min = boxRef.current.height / 2;
-				// const max = img.height - boxRef.current.height / 2;
-				const max =
-					imageSizeRef.current.height - boxRef.current.height / 2;
-				return Math.max(
-					min,
-					Math.min(max, touchY - dragOffset.current),
-				);
-			});
-		};
-
-		const handleTouchEnd = () => {
-			isDragging.current = false;
-		};
-
-		const handleMouseDown = (e) => {
-			console.log("handleMouseDown");
-			const mouseY = getCanvasY(e.clientY);
-			const box = boxRef.current;
-
-			if (mouseY >= box.y && mouseY <= box.y + box.height) {
-				isDragging.current = true;
-				dragOffset.current = mouseY - textY;
-			}
-		};
-
-		const handleMouseMove = (e) => {
-			console.log("handleMouseMove");
-			if (!isDragging.current) return;
-
-			const mouseY = getCanvasY(e.clientY);
-			setTextY(mouseY - dragOffset.current);
-		};
-
-		const handleMouseUp = () => {
-			isDragging.current = false;
-		};
-
-		canvas.addEventListener("touchstart", handleTouchStart);
-		canvas.addEventListener("touchmove", handleTouchMove);
-		canvas.addEventListener("touchend", handleTouchEnd);
-
-		canvas.addEventListener("mousedown", handleMouseDown);
-		canvas.addEventListener("mousemove", handleMouseMove);
-		canvas.addEventListener("mouseup", handleMouseUp);
-
-		return () => {
-			canvas.removeEventListener("touchstart", handleTouchStart);
-			canvas.removeEventListener("touchmove", handleTouchMove);
-			canvas.removeEventListener("touchend", handleTouchEnd);
-
-			canvas.removeEventListener("mousedown", handleMouseDown);
-			canvas.removeEventListener("mousemove", handleMouseMove);
-			canvas.removeEventListener("mouseup", handleMouseUp);
-		};
-	}, []);
+	}, [imageFile, sliderValue, activeStyle]);
 
 	function handleImagePick(e) {
-		console.log("e", e);
-		if (!e?.target?.files?.length) {
-			return;
-		}
-		const file = e?.target?.files[0];
-
-		const url = URL.createObjectURL(file);
-		setImage(url);
+		if (!e?.target?.files?.length) return;
+		setImageFile(e.target.files[0]);
 	}
 
 	const textPresets = [
@@ -120,109 +31,58 @@ function App() {
 				bgColor: "white",
 			},
 		},
+		{
+			title: "Good Morning",
+			style: {
+				textAlign: "center",
+				textColor: "white",
+				bgColor: "black",
+			},
+		},
 	];
 
-	const downloadImage = () => {
-		const canvas = document.createElement("canvas");
-		const ctx = canvas.getContext("2d");
-
-		const img = new Image();
-		img.src = image; // your selected image
-
-		img.onload = () => {
-			canvas.width = img.width;
-			canvas.height = img.height;
-
-			ctx.drawImage(img, 0, 0);
-			ctx.font = textPresets[activeStyle]?.font;
-			ctx.fillStyle = textPresets[activeStyle]?.textColor;
-			ctx.textAlign = textPresets[activeStyle]?.textAlign;
-			ctx.fillText(text, canvas.width / 2, canvas.height - 50);
-
-			const link = document.createElement("a");
-			link.download = "good-morning.png";
-			link.href = canvas.toDataURL("image/png");
-			link.click();
-		};
-	};
-
-	const getCanvasY = (clientY) => {
-		const rect = canvasRef.current.getBoundingClientRect();
-		const scaleY = canvasRef.current.height / rect.height;
-		return (clientY - rect.top) * scaleY;
-	};
-
-	const drawCanvas = (imgSrc) => {
+	const drawCanvas = async (file) => {
 		const canvas = canvasRef.current;
 		const ctx = canvas.getContext("2d");
-		const img = new Image();
-		const dpr = window.devicePixelRatio || 1;
 
-		img.src = imgSrc;
+		// createImageBitmap with imageOrientation respects EXIF rotation from camera photos
+		const bitmap = await createImageBitmap(file, {
+			imageOrientation: "from-image",
+		});
 
-		img.onload = () => {
-			imageSizeRef.current = {
-				width: img.width,
-				height: img.height,
-			};
-			// High-DPI setup
-			canvas.width = img.width * dpr;
-			canvas.height = img.height * dpr;
-			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		canvas.width = bitmap.width;
+		canvas.height = bitmap.height;
 
-			// Draw image
-			ctx.clearRect(0, 0, img.width, img.height);
-			ctx.drawImage(img, 0, 0);
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		ctx.drawImage(bitmap, 0, 0);
 
-			// ===== TEXT CONFIG =====
-			const fontSize = img.width * 0.06; // tweak this
-			const padding = fontSize * 0.4;
-			const radius = fontSize * 0.4;
+		const fontSize = bitmap.width * 0.06;
+		const padding = fontSize * 0.4;
+		const radius = fontSize * 0.4;
 
-			ctx.font = `${fontSize}px sans-serif`;
-			ctx.textAlign = "center";
-			ctx.textBaseline = "middle";
+		ctx.font = `${fontSize}px sans-serif`;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "middle";
 
-			const textValue = textPresets[activeStyle]?.title || "Good Morning";
+		const textValue = textPresets[activeStyle]?.title || "Good Morning";
+		const metrics = ctx.measureText(textValue);
+		const textWidth = metrics.width;
+		const textHeight = fontSize;
 
-			// Measure text
-			const metrics = ctx.measureText(textValue);
-			const textWidth = metrics.width;
-			const textHeight = fontSize;
+		const x = bitmap.width / 2;
+		const y = ((100 - sliderValue) / 100) * bitmap.height;
 
-			// Position
-			const x = img.width / 2;
-			// const y = img.height - fontSize * 3.5;
-			const y = textY;
-			if (textY === null) {
-				setTextY(img.height - fontSize * 3.5);
-			}
+		const boxWidth = textWidth + padding * 2;
+		const boxHeight = textHeight + padding * 2;
+		const boxX = x - boxWidth / 2;
+		const boxY = y - boxHeight / 2;
 
-			const boxWidth = textWidth + padding * 2;
-			const boxHeight = textHeight + padding * 2;
+		ctx.fillStyle = textPresets[activeStyle]?.style?.bgColor;
+		drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, radius);
+		ctx.fill();
 
-			const boxX = x - boxWidth / 2;
-			const boxY = y - boxHeight / 2;
-
-			boxRef.current = {
-				x: boxX,
-				y: boxY,
-				width: boxWidth,
-				height: boxHeight,
-			};
-
-			// Background
-			ctx.fillStyle = textPresets[activeStyle]?.style?.bgColor;
-			drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, radius);
-			ctx.fill();
-
-			// Text
-			// ctx.fillStyle = textPresets[activeStyle]?.style?.textColor;
-			ctx.fillStyle = isDragging.current
-				? "rgba(255,255,255,0.7)"
-				: textPresets[activeStyle]?.style?.textColor;
-			ctx.fillText(textValue, x, y);
-		};
+		ctx.fillStyle = textPresets[activeStyle]?.style?.textColor;
+		ctx.fillText(textValue, x, y);
 	};
 
 	const drawRoundedRect = (ctx, x, y, width, height, radius) => {
@@ -244,14 +104,27 @@ function App() {
 		ctx.closePath();
 	};
 
+	const dataURLtoBlob = (dataURL) => {
+		const arr = dataURL.split(",");
+		const mime = arr[0].match(/:(.*?);/)[1];
+		const bstr = atob(arr[1]);
+		const u8arr = new Uint8Array(bstr.length);
+		for (let i = 0; i < bstr.length; i++) {
+			u8arr[i] = bstr.charCodeAt(i);
+		}
+		return new Blob([u8arr], { type: mime });
+	};
+
 	const shareImage = async () => {
 		const canvas = canvasRef.current;
 
-		canvas.toBlob(async (blob) => {
-			const file = new File([blob], "good-morning.png", {
-				type: "image/png",
-			});
+		// Use synchronous toDataURL so we stay within the user gesture context
+		// (toBlob is async and breaks navigator.share on iOS/Android)
+		const dataURL = canvas.toDataURL("image/png");
+		const blob = dataURLtoBlob(dataURL);
+		const file = new File([blob], "good-morning.png", { type: "image/png" });
 
+		try {
 			if (navigator.canShare && navigator.canShare({ files: [file] })) {
 				await navigator.share({
 					files: [file],
@@ -259,9 +132,25 @@ function App() {
 					text: "Good Morning 🌞",
 				});
 			} else {
-				alert("Sharing not supported on this device");
+				// Desktop fallback: download the image
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement("a");
+				a.href = url;
+				a.download = "good-morning.png";
+				a.click();
+				URL.revokeObjectURL(url);
 			}
-		});
+		} catch (err) {
+			if (err.name !== "AbortError") {
+				// Share failed (e.g. HTTP instead of HTTPS) — fall back to download
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement("a");
+				a.href = url;
+				a.download = "good-morning.png";
+				a.click();
+				URL.revokeObjectURL(url);
+			}
+		}
 	};
 
 	return (
@@ -270,7 +159,7 @@ function App() {
 			<h1 style={{ textIndent: -9999999999, position: "absolute" }}>
 				Good Morning App
 			</h1>
-			<div className={`ui-wrap ${image ? "d-none" : ""}`}>
+			<div className={`ui-wrap ${imageFile ? "d-none" : ""}`}>
 				<div className="ui-wrap-inner">
 					<div className="steps">
 						<Step text1={"Tap The "} text2={"Button"} />
@@ -281,7 +170,6 @@ function App() {
 						<BtnCamera />
 					</label>
 				</div>
-				<TextStyles presets={textPresets} />
 				<input
 					id="input-file"
 					className="input-file"
@@ -290,14 +178,53 @@ function App() {
 					onChange={handleImagePick}
 				/>
 			</div>
-			<div className={`ui-wrap-image ${image ? "" : "d-none"}`}>
-				<div className="ui-wrap-image-container">
-					<canvas
-						ref={canvasRef}
-						style={{ maxWidth: "100%", borderRadius: 8 }}
-					/>
+			<div className={`ui-wrap-image ${imageFile ? "" : "d-none"}`}>
+				<div className="ui-wrap-image-inner">
+					<div className="ui-wrap-image-container">
+						<canvas
+							ref={canvasRef}
+							style={{
+								maxWidth: "100%",
+								borderRadius: 8,
+							}}
+						/>
+					</div>
+					<div className="slider-wrap">
+						<input
+							type="range"
+							min="5"
+							max="95"
+							value={sliderValue}
+							onChange={(e) =>
+								setSliderValue(Number(e.target.value))
+							}
+							className="text-position-slider"
+						/>
+						<div className="color-pallets">
+							{textPresets?.length &&
+								textPresets?.map((preset, index) => {
+									return (
+										<div
+											key={preset?.title + " " + index}
+											className="color-pallet"
+											onClick={() => {
+												setActiveStyle(index);
+											}}
+											style={{
+												backgroundColor:
+													preset?.style?.bgColor,
+											}}
+										></div>
+									);
+								})}
+						</div>
+					</div>
 				</div>
-				<CameraShare onCameraPress={handleImagePick} />
+				{/* <TextStyles presets={textPresets} setStyle={setActiveStyle} /> */}
+				<CameraShare
+					onCameraPress={handleImagePick}
+					onSharePress={shareImage}
+				/>
 			</div>
 		</div>
 	);

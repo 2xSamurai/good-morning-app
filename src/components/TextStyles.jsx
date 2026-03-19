@@ -1,4 +1,4 @@
-const TextStyles = ({ presets = [], setText = () => {} }) => {
+const TextStyles = ({ presets = [], setStyle = () => {} }) => {
 	return (
 		<div className="text-styles">
 			{/* <h2>Good Morning</h2> */}
@@ -7,12 +7,12 @@ const TextStyles = ({ presets = [], setText = () => {} }) => {
 
 			<div style={{ marginTop: 12 }}>
 				{presets?.length &&
-					presets?.map((preset) => {
+					presets?.map((preset, index) => {
 						console.log("preset", presets);
 						return (
 							<button
-								key={preset?.title}
-								onClick={() => setText(preset?.title)}
+								key={preset?.title + " " + index}
+								onClick={() => setStyle(index)}
 								style={{
 									marginRight: 8,
 									color: preset?.style?.textColor,
