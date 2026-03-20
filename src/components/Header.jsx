@@ -1,7 +1,7 @@
 const Header = () => {
 	return (
 		<header className="header">
-			<a href="/">
+			<a href="/good-morning-app/">
 				<svg
 					width="154"
 					height="35"

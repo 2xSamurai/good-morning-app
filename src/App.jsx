@@ -8,14 +8,39 @@ import CameraShare from "./components/CameraShare";
 function App() {
 	const [imageFile, setImageFile] = useState(null);
 	const [activeStyle, setActiveStyle] = useState(0);
-	const [sliderValue, setSliderValue] = useState(85); // 0–100, maps to % of image height
+	const [sliderValue, setSliderValue] = useState(85);
 	const canvasRef = useRef(null);
+	const offscreenCanvasRef = useRef(null); // cached decoded image
 
+	// Decode image once per file — async, expensive
 	useEffect(() => {
-		if (imageFile) {
-			drawCanvas(imageFile);
-		}
-	}, [imageFile, sliderValue, activeStyle]);
+		if (!imageFile) return;
+		let cancelled = false;
+		createImageBitmap(imageFile, { imageOrientation: "from-image" }).then(
+			(bitmap) => {
+				if (cancelled) {
+					bitmap.close();
+					return;
+				}
+				const offscreen = document.createElement("canvas");
+				offscreen.width = bitmap.width;
+				offscreen.height = bitmap.height;
+				offscreen.getContext("2d").drawImage(bitmap, 0, 0);
+				bitmap.close();
+				offscreenCanvasRef.current = offscreen;
+				drawOverlay(offscreen, sliderValue, activeStyle);
+			},
+		);
+		return () => {
+			cancelled = true;
+		};
+	}, [imageFile]);
+
+	// Redraw text overlay only — sync, no decoding, runs on every slider/style change
+	useEffect(() => {
+		if (!offscreenCanvasRef.current) return;
+		drawOverlay(offscreenCanvasRef.current, sliderValue, activeStyle);
+	}, [sliderValue, activeStyle]);
 
 	function handleImagePick(e) {
 		if (!e?.target?.files?.length) return;
@@ -41,22 +66,17 @@ function App() {
 		},
 	];
 
-	const drawCanvas = async (file) => {
+	const drawOverlay = (offscreen, currentSliderValue, currentActiveStyle) => {
 		const canvas = canvasRef.current;
 		const ctx = canvas.getContext("2d");
 
-		// createImageBitmap with imageOrientation respects EXIF rotation from camera photos
-		const bitmap = await createImageBitmap(file, {
-			imageOrientation: "from-image",
-		});
+		canvas.width = offscreen.width;
+		canvas.height = offscreen.height;
 
-		canvas.width = bitmap.width;
-		canvas.height = bitmap.height;
+		// Copy pre-decoded image from cache — instant
+		ctx.drawImage(offscreen, 0, 0);
 
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
-		ctx.drawImage(bitmap, 0, 0);
-
-		const fontSize = bitmap.width * 0.06;
+		const fontSize = offscreen.width * 0.06;
 		const padding = fontSize * 0.4;
 		const radius = fontSize * 0.4;
 
@@ -64,24 +84,25 @@ function App() {
 		ctx.textAlign = "center";
 		ctx.textBaseline = "middle";
 
-		const textValue = textPresets[activeStyle]?.title || "Good Morning";
+		const preset = textPresets[currentActiveStyle];
+		const textValue = preset?.title || "Good Morning";
 		const metrics = ctx.measureText(textValue);
 		const textWidth = metrics.width;
 		const textHeight = fontSize;
 
-		const x = bitmap.width / 2;
-		const y = ((100 - sliderValue) / 100) * bitmap.height;
+		const x = offscreen.width / 2;
+		const y = ((100 - currentSliderValue) / 100) * offscreen.height;
 
 		const boxWidth = textWidth + padding * 2;
 		const boxHeight = textHeight + padding * 2;
 		const boxX = x - boxWidth / 2;
 		const boxY = y - boxHeight / 2;
 
-		ctx.fillStyle = textPresets[activeStyle]?.style?.bgColor;
+		ctx.fillStyle = preset?.style?.bgColor;
 		drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, radius);
 		ctx.fill();
 
-		ctx.fillStyle = textPresets[activeStyle]?.style?.textColor;
+		ctx.fillStyle = preset?.style?.textColor;
 		ctx.fillText(textValue, x, y);
 	};
 
@@ -122,14 +143,16 @@ function App() {
 		// (toBlob is async and breaks navigator.share on iOS/Android)
 		const dataURL = canvas.toDataURL("image/png");
 		const blob = dataURLtoBlob(dataURL);
-		const file = new File([blob], "good-morning.png", { type: "image/png" });
+		const file = new File([blob], "good-morning.png", {
+			type: "image/png",
+		});
 
 		try {
 			if (navigator.canShare && navigator.canShare({ files: [file] })) {
 				await navigator.share({
 					files: [file],
-					title: "Good Morning",
-					text: "Good Morning 🌞",
+					title: "",
+					text: "",
 				});
 			} else {
 				// Desktop fallback: download the image
